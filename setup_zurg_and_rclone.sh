@@ -166,10 +166,10 @@ chmod -R 755 /mnt/zurg
 # Get the local IP address for Zurg's WebDAV URL
 LOCAL_IP=$(retrieve_saved_ip)
 if [ -z "$LOCAL_IP" ]; then
-    echo -e "${YELLOW}Local IP not found in local_ip.txt. Prompting for manual input...${NC}"
-    LOCAL_IP=$(get_local_ip)  # This calls the manual_ip_prompt function from common_functions.sh
+    echo -e "${YELLOW}Local IP not found in local_ip.txt. Retrieving from Zurg container...${NC}"
+    LOCAL_IP=$(get_zurg_container_ip)  # Updated to get the container's IP directly
     if [ -z "$LOCAL_IP" ]; then
-        echo -e "${RED}Error: Failed to retrieve or input a valid local IP address.${NC}"
+        echo -e "${RED}Error: Failed to retrieve Zurg container IP address.${NC}"
         exit 1
     fi
 fi
