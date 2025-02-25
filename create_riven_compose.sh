@@ -144,7 +144,7 @@ services:
       - riven_network
 
   riven_postgres:
-    image: postgres:16.3-alpine3.20
+    image: postgres:17.0-alpine3.20
     container_name: riven-db
     environment:
       PUID: \${PUID}
