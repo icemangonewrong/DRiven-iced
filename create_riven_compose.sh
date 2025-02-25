@@ -15,8 +15,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-    
-
 # Get the local IP for ORIGIN
 local_ip=$(retrieve_saved_ip)
 if [ -z "$local_ip" ]; then
@@ -89,6 +87,12 @@ EOF
 
 echo -e "${GREEN}.env file created with PUID, PGID, and TZ.${NC}"
 
+# Check if /mnt/zurg is mounted (since rclone is now a systemd service)
+if ! ls /mnt/zurg &> /dev/null; then
+    echo -e "${RED}Error: /mnt/zurg is not mounted. Ensure rclone-mount.service is running.${NC}"
+    exit 1
+fi
+
 # Create the docker-compose.yml file
 cat <<EOF > ./riven/docker-compose.yml
 services:
@@ -159,7 +163,6 @@ services:
       retries: 5
     networks:
       - riven_network
-
 
 networks:
   riven_network:

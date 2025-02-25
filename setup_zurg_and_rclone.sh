@@ -9,6 +9,12 @@ if [ ! -f "./common_functions.sh" ]; then
 fi
 source ./common_functions.sh
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
 # Function to detect the operating system
 detect_os() {
     if [[ -e /etc/os-release ]]; then
@@ -24,19 +30,19 @@ OS_NAME=$(detect_os)
 
 # Check for root privileges
 if [[ $EUID -ne 0 ]]; then
-    echo "Error: This script must be run with administrative privileges. Please run with sudo."
+    echo -e "${RED}Error: This script must be run with administrative privileges. Please run with sudo.${NC}"
     exit 1
 fi
 
 # Ensure SUDO_USER is set
 if [ -z "$SUDO_USER" ]; then
-    echo "Error: SUDO_USER is not set. Please run the script using sudo."
+    echo -e "${RED}Error: SUDO_USER is not set. Please run the script using sudo.${NC}"
     exit 1
 fi
 
-echo "Running setup_zurg_and_rclone.sh..."
+echo -e "${GREEN}Running setup_zurg_and_rclone.sh...${NC}"
 
-echo "Setting up Zurg and Rclone..."
+echo -e "${GREEN}Setting up Zurg and Rclone...${NC}"
 
 # Get PUID and PGID from the user who invoked sudo
 PUID=$(id -u "$SUDO_USER")
@@ -46,148 +52,42 @@ PGID=$(id -g "$SUDO_USER")
 export PUID PGID
 export TZ=$(cat /etc/timezone 2>/dev/null || echo "UTC")
 
-# Function to check if both Zurg and Rclone containers are running
-are_containers_running() {
-    local zurg_running rclone_running
-    zurg_running=$(docker ps --filter "name=zurg" --filter "status=running" -q)
-    rclone_running=$(docker ps --filter "name=rclone" --filter "status=running" -q)
-    if [[ -n "$zurg_running" && -n "$rclone_running" ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Check if Zurg and Rclone are already installed
-if are_containers_running; then
-    echo "Zurg and Rclone are already running. Skipping installation."
-    exit 0
-fi
-
-# Get Real-Debrid API Key using the common function
-REAL_DEBRID_API_KEY=$(get_real_debrid_api_key)
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to get Real-Debrid API Key."
-    exit 1
-fi
-
-# Clone zurg-testing repository if 'zurg' directory doesn't exist
-if [ ! -d "zurg" ]; then
-    git clone https://github.com/debridmediamanager/zurg-testing.git zurg
+# Check if Zurg container is already running
+zurg_running=$(docker ps --filter "name=zurg" --filter "status=running" -q)
+if [[ -n "$zurg_running" ]]; then
+    echo -e "${YELLOW}Zurg is already running. Skipping container setup.${NC}"
+else
+    # Get Real-Debrid API Key using the common function
+    REAL_DEBRID_API_KEY=$(get_real_debrid_api_key)
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to clone zurg-testing repository."
+        echo -e "${RED}Error: Failed to get Real-Debrid API Key.${NC}"
         exit 1
     fi
-fi
 
-# Correct Docker image
-ZURG_IMAGE="ghcr.io/debridmediamanager/zurg-testing:latest"
-
-# Use yq to modify YAML file (install if not present)
-if ! command -v yq &> /dev/null; then
-    echo "Installing yq..."
-    case "$OS_NAME" in
-        ubuntu|debian)
-            apt-get update && apt-get install -y wget
-            wget -q https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq
-            chmod +x /usr/local/bin/yq
-            ;;
-        arch|manjaro)
-            pacman -Sy --noconfirm yq
-            ;;
-        centos|fedora|rhel)
-            wget -q https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq
-            chmod +x /usr/local/bin/yq
-            ;;
-        *)
-            echo "Your OS is not directly supported by this script."
-            echo "Attempting to install yq by downloading the binary."
-            wget -q https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq
-            chmod +x /usr/local/bin/yq
-            ;;
-    esac
-    # Verify installation
-    if ! command -v yq &> /dev/null; then
-        echo "Error: Failed to install yq."
-        exit 1
+    # Clone zurg-testing repository if 'zurg' directory doesn't exist
+    if [ ! -d "zurg" ]; then
+        git clone https://github.com/debridmediamanager/zurg-testing.git zurg
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to clone zurg-testing repository.${NC}"
+            exit 1
+        fi
     fi
-fi
 
-# Update the token in config.yml using yq
-CONFIG_FILE="./zurg/config.yml"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: $CONFIG_FILE does not exist."
-    exit 1
-fi
+    # Correct Docker image
+    ZURG_IMAGE="ghcr.io/debridmediamanager/zurg-testing:latest"
 
-yq eval ".token = \"$REAL_DEBRID_API_KEY\"" -i "$CONFIG_FILE"
+    # Navigate to the zurg directory
+    cd zurg
+    mkdir -p data
 
-# Check if /mnt/zurg is mounted and accessible
-if mountpoint -q /mnt/zurg; then
-    echo "/mnt/zurg is already mounted."
-elif mount | grep "/mnt/zurg" &> /dev/null; then
-    echo "/mnt/zurg is mounted but not accessible. Attempting to unmount..."
-    umount -l /mnt/zurg
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Failed to unmount /mnt/zurg."
-        exit 1
+    # Remove existing docker-compose.yml if it exists to avoid conflicts
+    if [ -f "docker-compose.yml" ]; then
+        echo -e "${YELLOW}Removing existing docker-compose.yml...${NC}"
+        rm docker-compose.yml
     fi
-    echo "Successfully unmounted /mnt/zurg."
-else
-    echo "/mnt/zurg is not mounted."
-fi
 
-# Ensure /mnt/zurg directory exists and is not a mount point
-if [ -d "/mnt/zurg" ]; then
-    # Verify if it's a mount point
-    if mountpoint -q /mnt/zurg; then
-        echo "/mnt/zurg is still a mount point after unmounting. Exiting to prevent conflicts."
-        exit 1
-    else
-        echo "/mnt/zurg directory exists and is accessible."
-    fi
-else
-    # Create /mnt/zurg directory
-    echo "Creating /mnt/zurg directory..."
-    mkdir -p /mnt/zurg
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Failed to create /mnt/zurg directory."
-        exit 1
-    fi
-fi
-
-# Ensure proper ownership and permissions
-chown -R "$PUID:$PGID" /mnt/zurg
-chmod -R 755 /mnt/zurg
-
-# Function to detect WSL
-is_wsl() {
-    grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null
-}
-
-# Check if running in WSL
-if is_wsl; then
-    echo "Detected WSL environment."
-    VOLUME_OPTION="/mnt/zurg:/data:shared"
-    sudo mount --make-shared /
-else
-    echo "Detected native Linux environment."
-    VOLUME_OPTION="/mnt/zurg:/data:rshared"
-fi
-
-# Navigate to the zurg directory
-cd zurg
-mkdir data
-
-# Remove existing docker-compose.yml if it exists to avoid conflicts
-if [ -f "docker-compose.yml" ]; then
-    echo "Removing existing docker-compose.yml..."
-    rm docker-compose.yml
-    echo "Existing docker-compose.yml removed."
-fi
-
-# Create the docker-compose.yml file without the version field
-cat > docker-compose.yml << 'EOF'
+    # Create the docker-compose.yml file (only Zurg)
+    cat > docker-compose.yml << 'EOF'
 services:
   zurg:
     image: ${ZURG_IMAGE}
@@ -205,81 +105,129 @@ services:
     networks:
       - zurg_network
 
-  rclone:
-    image: rclone/rclone:latest
-    container_name: rclone
-    restart: unless-stopped
-    command: "mount zurg: /data --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full"
-    cap_add:
-      - SYS_ADMIN
-    devices:
-      - /dev/fuse
-    security_opt:
-      - apparmor:unconfined
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ${VOLUME_OPTION}
-      - ./rclone.conf:/config/rclone/rclone.conf
-    networks:
-      - zurg_network
-
 networks:
   zurg_network:
     driver: bridge
 EOF
 
-# Replace variables in the docker-compose.yml file
-sed -i "s|\${ZURG_IMAGE}|$ZURG_IMAGE|g" docker-compose.yml
-sed -i "s|\${PUID}|$PUID|g" docker-compose.yml
-sed -i "s|\${PGID}|$PGID|g" docker-compose.yml
-sed -i "s|\${TZ}|$TZ|g" docker-compose.yml
-sed -i "s|\${REAL_DEBRID_API_KEY}|$REAL_DEBRID_API_KEY|g" docker-compose.yml
-sed -i "s|\${VOLUME_OPTION}|$VOLUME_OPTION|g" docker-compose.yml
+    # Replace variables in the docker-compose.yml file
+    sed -i "s|\${ZURG_IMAGE}|$ZURG_IMAGE|g" docker-compose.yml
+    sed -i "s|\${PUID}|$PUID|g" docker-compose.yml
+    sed -i "s|\${PGID}|$PGID|g" docker-compose.yml
+    sed -i "s|\${TZ}|$TZ|g" docker-compose.yml
+    sed -i "s|\${REAL_DEBRID_API_KEY}|$REAL_DEBRID_API_KEY|g" docker-compose.yml
 
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to create docker-compose.yml."
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to create docker-compose.yml.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}docker-compose.yml created successfully for Zurg.${NC}"
+
+    # Bring up the Zurg container
+    docker compose up -d
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to start Zurg container.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Zurg container is up and running.${NC}"
+    cd ..
+fi
+
+# Setup rclone as a bare-metal systemd service
+echo -e "${GREEN}Setting up rclone as a systemd service...${NC}"
+
+# Install rclone if not present
+if ! command -v rclone &> /dev/null; then
+    echo -e "${YELLOW}Installing rclone...${NC}"
+    case "$OS_NAME" in
+        ubuntu|debian)
+            apt-get update && apt-get install -y rclone fuse
+            ;;
+        arch|manjaro)
+            pacman -Sy --noconfirm rclone fuse
+            ;;
+        centos|fedora|rhel)
+            yum install -y rclone fuse
+            ;;
+        *)
+            echo -e "${RED}Unsupported OS for automatic rclone install. Please install rclone and fuse manually.${NC}"
+            exit 1
+            ;;
+    esac
+fi
+
+# Ensure /mnt/zurg exists and has correct permissions
+mkdir -p /mnt/zurg
+chown -R "$PUID:$PGID" /mnt/zurg
+chmod -R 755 /mnt/zurg
+
+# Get the local IP address for Zurg's WebDAV URL
+LOCAL_IP=$(retrieve_saved_ip)
+if [ -z "$LOCAL_IP" ]; then
+    echo -e "${YELLOW}Local IP not found in local_ip.txt. Prompting for manual input...${NC}"
+    LOCAL_IP=$(get_local_ip)  # This calls the manual_ip_prompt function from common_functions.sh
+    if [ -z "$LOCAL_IP" ]; then
+        echo -e "${RED}Error: Failed to retrieve or input a valid local IP address.${NC}"
+        exit 1
+    fi
+fi
+ZURG_WEBDAV_URL="http://$LOCAL_IP:9999/dav"
+echo -e "${GREEN}Using Zurg WebDAV URL: $ZURG_WEBDAV_URL${NC}"
+
+# Create rclone config with dynamic IP
+RCLONE_CONF_DIR="/home/$SUDO_USER/.config/rclone"
+RCLONE_CONF="$RCLONE_CONF_DIR/rclone.conf"
+mkdir -p "$RCLONE_CONF_DIR"
+cat > "$RCLONE_CONF" << EOF
+[zurg]
+type = webdav
+url = $ZURG_WEBDAV_URL
+vendor = other
+pacer_min_sleep = 0
+EOF
+chown "$PUID:$PGID" "$RCLONE_CONF_DIR" -R
+chmod 600 "$RCLONE_CONF"
+
+# Create systemd service file
+cat > /etc/systemd/system/rclone-mount.service << EOF
+[Unit]
+Description=rclone mount for zurg remote
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rclone mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full
+ExecStop=/bin/fusermount -u /mnt/zurg
+Restart=on-failure
+User=$SUDO_USER
+Group=$(id -gn "$SUDO_USER")
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd, enable, and start the service
+systemctl daemon-reload
+systemctl enable rclone-mount.service
+systemctl start rclone-mount.service
+
+# Verify the service is running
+if systemctl is-active --quiet rclone-mount.service; then
+    echo -e "${GREEN}rclone systemd service is active and running.${NC}"
+else
+    echo -e "${RED}Error: rclone systemd service failed to start. Check 'systemctl status rclone-mount.service'.${NC}"
     exit 1
 fi
 
-echo "docker-compose.yml created successfully."
-
-# Ensure the rclone config directory exists
-if [ ! -d "rclone" ]; then
-    mkdir rclone
-    echo "Created rclone configuration directory."
-fi
-
-# Check for required dependencies
-for cmd in git curl docker docker-compose; do
-    if ! command -v "$cmd" &> /dev/null; then
-        echo "Error: $cmd is not installed. Please install it and rerun the script."
-        exit 1
-    fi
-done
-
-# Check if Docker is running
-if ! systemctl is-active --quiet docker; then
-    echo "Docker service is not running. Starting Docker..."
-    systemctl start docker
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Failed to start Docker service."
-        exit 1
-    fi
-fi
-
-echo "Docker service is running."
-
-echo "Bringing up Zurg and Rclone Docker containers..."
-
-# Bring up the containers
-docker compose up -d
-
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to start Zurg and Rclone containers."
+# Verify the mount
+if ls /mnt/zurg &> /dev/null; then
+    echo -e "${GREEN}rclone mount at /mnt/zurg is successful.${NC}"
+else
+    echo -e "${RED}Error: Failed to mount /mnt/zurg. Check rclone configuration and Zurg container status.${NC}"
     exit 1
 fi
 
-echo "Zurg and Rclone containers are up and running."
+echo -e "${GREEN}Zurg and rclone setup complete!${NC}"
