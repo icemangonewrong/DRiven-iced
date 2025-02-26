@@ -37,34 +37,40 @@ else
 fi
 export TZ
 
-# Ask if zurg library is at default path
+# Ask if zurg library is at default path with validation
 echo -e "${GREEN}Zurg Library Configuration:${NC}"
 echo -e "${GREEN}1. Default path: /mnt/zurg/__all__${NC}"
 echo -e "${GREEN}2. Custom path: You'll need to specify the path${NC}"
 echo -e "${YELLOW}Type 'y' for default path, 'n' for custom path${NC}"
-read -p "$(echo -e "${YELLOW}Your choice (y/n): ${NC}")" ZURG_DEFAULT_PATH
-
-if [[ "$ZURG_DEFAULT_PATH" =~ ^[Yy]$ ]]; then
-    ZURG_ALL_PATH="/mnt/zurg/__all__"
-else
-    echo -e "${GREEN}Enter the full path where your Zurg library is located${NC}"
-    echo -e "${GREEN}Example: /path/to/your/zurg/library${NC}"
-    read -p "$(echo -e "${YELLOW}Enter your Zurg library path: ${NC}")" ZURG_ALL_PATH
-    if [ -z "$ZURG_ALL_PATH" ]; then
-        echo -e "${RED}Error: Zurg library path cannot be empty.${NC}"
-        exit 1
+while true; do
+    read -p "$(echo -e "${YELLOW}Your choice (y/n): ${NC}")" ZURG_DEFAULT_PATH
+    if [[ "$ZURG_DEFAULT_PATH" =~ ^[Yy]$ ]]; then
+        ZURG_ALL_PATH="/mnt/zurg/__all__"
+        break
+    elif [[ "$ZURG_DEFAULT_PATH" =~ ^[Nn]$ ]]; then
+        echo -e "${GREEN}Enter the full path where your Zurg library is located${NC}"
+        echo -e "${GREEN}Example: /path/to/your/zurg/library${NC}"
+        read -p "$(echo -e "${YELLOW}Enter your Zurg library path: ${NC}")" ZURG_ALL_PATH
+        if [ -n "$ZURG_ALL_PATH" ]; then
+            break
+        fi
+        echo -e "${RED}Error: Zurg library path cannot be empty. Please try again.${NC}"
+    else
+        echo -e "${RED}Error: Please enter 'y' or 'n'.${NC}"
     fi
-fi
+done
 
 # Save ZURG_ALL_PATH for future reference
 echo "$ZURG_ALL_PATH" > ZURG_ALL_PATH.txt
 
-# Get Real-Debrid API key directly
-read -p "Enter your Real-Debrid API Key: " RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY
-if [ -z "$RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY" ]; then
-    echo -e "${RED}Error: Real-Debrid API Key cannot be empty.${NC}"
-    exit 1
-fi
+# Get Real-Debrid API key directly, loop until non-empty
+while true; do
+    read -p "Enter your Real-Debrid API Key: " RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY
+    if [ -n "$RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY" ]; then
+        break
+    fi
+    echo -e "${RED}Error: Real-Debrid API Key cannot be empty. Please try again.${NC}"
+done
 
 # Ensure the /home/docker/riven-db directory exists with correct permissions
 POSTGRES_DIR="/home/docker/riven-db"
