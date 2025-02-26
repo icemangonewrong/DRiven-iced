@@ -29,10 +29,9 @@ set /p ADD_PORTS="Do you want to make any other ports accessible via %USER_IP%:?
 if /i "%ADD_PORTS%"=="Y" (
     set /p ADDITIONAL_PORTS_INPUT="Enter the port(s) you want to proxy (comma-separated, e.g., 8080,9090): "
     
-    :: Process the input and append to ADDITIONAL_PORTS
-    for %%p in (%ADDITIONAL_PORTS_INPUT%) do (
-        set ADDITIONAL_PORTS=%ADDITIONAL_PORTS% %%p
-    )
+    :: Process the input by replacing commas with spaces and appending to ADDITIONAL_PORTS
+    set "TEMP_PORTS=%ADDITIONAL_PORTS_INPUT:,= %"
+    set ADDITIONAL_PORTS=%ADDITIONAL_PORTS% %TEMP_PORTS%
 )
 
 :: Step 4: Process all additional ports collected
