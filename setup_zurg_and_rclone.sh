@@ -163,27 +163,14 @@ mkdir -p /mnt/zurg
 chown -R "$PUID:$PGID" /mnt/zurg
 chmod -R 755 /mnt/zurg
 
-# Get the local IP address for Zurg's WebDAV URL
-LOCAL_IP=$(retrieve_saved_ip)
-if [ -z "$LOCAL_IP" ]; then
-    echo -e "${YELLOW}Local IP not found in local_ip.txt. Retrieving from Zurg container...${NC}"
-    LOCAL_IP=$(get_zurg_container_ip)  # Updated to get the container's IP directly
-    if [ -z "$LOCAL_IP" ]; then
-        echo -e "${RED}Error: Failed to retrieve Zurg container IP address.${NC}"
-        exit 1
-    fi
-fi
-ZURG_WEBDAV_URL="http://$LOCAL_IP:9999/dav"
-echo -e "${GREEN}Using Zurg WebDAV URL: $ZURG_WEBDAV_URL${NC}"
-
-# Create rclone config with dynamic IP
+# Create rclone config
 RCLONE_CONF_DIR="/home/$SUDO_USER/.config/rclone"
 RCLONE_CONF="$RCLONE_CONF_DIR/rclone.conf"
 mkdir -p "$RCLONE_CONF_DIR"
 cat > "$RCLONE_CONF" << EOF
 [zurg]
 type = webdav
-url = $ZURG_WEBDAV_URL
+url = http://zurg:9999/dav
 vendor = other
 pacer_min_sleep = 0
 EOF
@@ -226,7 +213,7 @@ fi
 if ls /mnt/zurg &> /dev/null; then
     echo -e "${GREEN}rclone mount at /mnt/zurg is successful.${NC}"
 else
-    echo -e "${RED}Error: Failed to mount /mnt/zurg. Check rclone configuration and Zurg container status.${NC}"
+    echo -e "${RED}Error: Failed to mount /mnt/zurg. Check rclone configuration.${NC}"
     exit 1
 fi
 
