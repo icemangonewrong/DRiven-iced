@@ -142,12 +142,26 @@ fi
 # Setup rclone as a bare-metal systemd service
 echo -e "${GREEN}Setting up rclone as a systemd service...${NC}"
 
-# Install rclone if not present
+# Install rclone if not present with retry logic for APT lock
 if ! command -v rclone &> /dev/null; then
     echo -e "${YELLOW}Installing rclone...${NC}"
     case "$OS_NAME" in
         ubuntu|debian)
-            apt-get update && apt-get install -y rclone fuse
+            # Wait for APT lock to free up
+            retries=5
+            delay=10
+            for ((i=1; i<=retries; i++)); do
+                apt-get update && apt-get install -y rclone fuse
+                if [ $? -eq 0 ]; then
+                    break
+                fi
+                if [ $i -eq $retries ]; then
+                    echo -e "${RED}Error: Failed to install rclone after $retries attempts. APT lock persists.${NC}"
+                    exit 1
+                fi
+                echo -e "${YELLOW}APT lock detected. Retrying in $delay seconds (attempt $i/$retries)...${NC}"
+                sleep $delay
+            done
             ;;
         arch|manjaro)
             pacman -Sy --noconfirm rclone fuse
@@ -160,6 +174,12 @@ if ! command -v rclone &> /dev/null; then
             exit 1
             ;;
     esac
+fi
+
+# Verify rclone is installed
+if ! command -v rclone &> /dev/null; then
+    echo -e "${RED}Error: rclone installation failed or rclone not found in PATH.${NC}"
+    exit 1
 fi
 
 # Ensure /etc/fuse.conf allows user_allow_other
