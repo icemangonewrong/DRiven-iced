@@ -59,10 +59,10 @@ fi
 # Save ZURG_ALL_PATH for future reference
 echo "$ZURG_ALL_PATH" > ZURG_ALL_PATH.txt
 
-# Get Real-Debrid API key using the common function
-RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY=$(get_real_debrid_api_key)
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Failed to get Real-Debrid API Key.${NC}"
+# Get Real-Debrid API key directly
+read -p "Enter your Real-Debrid API Key: " RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY
+if [ -z "$RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY" ]; then
+    echo -e "${RED}Error: Real-Debrid API Key cannot be empty.${NC}"
     exit 1
 fi
 
@@ -93,7 +93,7 @@ if ! ls /mnt/zurg &> /dev/null; then
     exit 1
 fi
 
-# Create the docker-compose.yml file
+# Create the docker-compose.yml file with proper variable substitution
 cat <<EOF > ./riven/docker-compose.yml
 services:
   riven-frontend:
@@ -105,9 +105,9 @@ services:
     volumes:
       - ./riven/rivenfrontend:/riven/config      
     environment:
-      - PUID=\${PUID}
-      - PGID=\${PGID}
-      - TZ=\${TZ}
+      - PUID=$PUID
+      - PGID=$PGID
+      - TZ=$TZ
       - ORIGIN=$ORIGIN
       - BACKEND_URL=http://riven:8080
       - DIALECT=postgres
@@ -120,9 +120,9 @@ services:
     container_name: riven
     restart: unless-stopped
     environment:
-      - PUID=\${PUID}
-      - PGID=\${PGID}
-      - TZ=\${TZ}
+      - PUID=$PUID
+      - PGID=$PGID
+      - TZ=$TZ
       - RIVEN_FORCE_ENV=true
       - RIVEN_DATABASE_HOST=postgresql+psycopg2://postgres:postgres@riven-db/riven
       - RIVEN_PLEX_URL=
@@ -147,15 +147,15 @@ services:
     image: postgres:17.0-alpine3.20
     container_name: riven-db
     environment:
-      PUID: \${PUID}
-      PGID: \${PGID}
-      TZ: \${TZ}
-      PGDATA: /var/lib/postgresql/data/
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: riven
+      - PUID=$PUID
+      - PGID=$PGID
+      - TZ=$TZ
+      - PGDATA=/var/lib/postgresql/data/
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=riven
     volumes:
-       - /home/docker/riven-db:/var/lib/postgresql/data
+      - /home/docker/riven-db:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
