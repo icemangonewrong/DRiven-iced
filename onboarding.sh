@@ -134,7 +134,7 @@ jq_command='.symlink.rclone_path = "/mnt/zurg/__all__" |
     .downloaders.real_debrid.proxy_enabled = false |
     .scraping.knightcrawler.enabled = true |
     .scraping.torrentio.enabled = true |
-    .content.plex_watchlist.enabled = true'
+    .content.plex_watchlist.enabled = false'
 
 # Check if 4K should be enabled and append to jq command
 if [[ "$ENABLE_4K" =~ ^[Yy][Ee]?[Ss]?$ ]]; then
