@@ -87,7 +87,7 @@ else
     fi
 
     # Create the docker-compose.yml file (only Zurg)
-    cat > docker-compose.yml << 'EOF'
+    cat > docker-compose.yml << EOF
 services:
   zurg:
     image: ${ZURG_IMAGE}
@@ -110,12 +110,8 @@ networks:
     driver: bridge
 EOF
 
-    # Replace variables in the docker-compose.yml file
-    sed -i "s|\${ZURG_IMAGE}|$ZURG_IMAGE|g" docker-compose.yml
-    sed -i "s|\${PUID}|$PUID|g" docker-compose.yml
-    sed -i "s|\${PGID}|$PGID|g" docker-compose.yml
-    sed -i "s|\${TZ}|$TZ|g" docker-compose.yml
-    sed -i "s|\${REAL_DEBRID_API_KEY}|$REAL_DEBRID_API_KEY|g" docker-compose.yml
+    # Substitute the Real-Debrid API key directly
+    sed -i "s|\${REAL_DEBRID_API_KEY}|${REAL_DEBRID_API_KEY}|g" docker-compose.yml
 
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to create docker-compose.yml.${NC}"
@@ -123,6 +119,17 @@ EOF
     fi
 
     echo -e "${GREEN}docker-compose.yml created successfully for Zurg.${NC}"
+
+    # Update config.yml with the Real-Debrid API key
+    CONFIG_FILE="./config.yml"
+    if [ -f "$CONFIG_FILE" ]; then
+        sed -i "s|token: yourtoken|token: ${REAL_DEBRID_API_KEY}|" "$CONFIG_FILE"
+    else
+        echo -e "${RED}Error: $CONFIG_FILE does not exist.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Updated $CONFIG_FILE with Real-Debrid API key.${NC}"
 
     # Bring up the Zurg container
     docker compose up -d
@@ -163,20 +170,16 @@ mkdir -p /mnt/zurg
 chown -R "$PUID:$PGID" /mnt/zurg
 chmod -R 755 /mnt/zurg
 
-# Get the local IP address for Zurg's WebDAV URL
-LOCAL_IP=$(retrieve_saved_ip)
-if [ -z "$LOCAL_IP" ]; then
-    echo -e "${YELLOW}Local IP not found in local_ip.txt. Prompting for manual input...${NC}"
-    LOCAL_IP=$(get_local_ip)  # This calls the manual_ip_prompt function from common_functions.sh
-    if [ -z "$LOCAL_IP" ]; then
-        echo -e "${RED}Error: Failed to retrieve or input a valid local IP address.${NC}"
-        exit 1
-    fi
+# Get Zurg's container IP address
+ZURG_CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' zurg)
+if [ -z "$ZURG_CONTAINER_IP" ]; then
+    echo -e "${RED}Error: Failed to retrieve Zurg container IP address. Is the Zurg container running?${NC}"
+    exit 1
 fi
-ZURG_WEBDAV_URL="http://$LOCAL_IP:9999/dav"
+ZURG_WEBDAV_URL="http://${ZURG_CONTAINER_IP}:9999/dav"
 echo -e "${GREEN}Using Zurg WebDAV URL: $ZURG_WEBDAV_URL${NC}"
 
-# Create rclone config with dynamic IP
+# Create rclone config with dynamic container IP
 RCLONE_CONF_DIR="/home/$SUDO_USER/.config/rclone"
 RCLONE_CONF="$RCLONE_CONF_DIR/rclone.conf"
 mkdir -p "$RCLONE_CONF_DIR"
