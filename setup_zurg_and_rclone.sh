@@ -57,12 +57,14 @@ zurg_running=$(docker ps --filter "name=zurg" --filter "status=running" -q)
 if [[ -n "$zurg_running" ]]; then
     echo -e "${YELLOW}Zurg is already running. Skipping container setup.${NC}"
 else
-    # Prompt for Real-Debrid API Key directly
-    read -p "Enter your Real-Debrid API Key: " REAL_DEBRID_API_KEY
-    if [ -z "$REAL_DEBRID_API_KEY" ]; then
-        echo -e "${RED}Error: Real-Debrid API Key cannot be empty.${NC}"
-        exit 1
-    fi
+    # Prompt for Real-Debrid API Key directly, loop until non-empty
+    while true; do
+        read -p "Enter your Real-Debrid API Key: " REAL_DEBRID_API_KEY
+        if [ -n "$REAL_DEBRID_API_KEY" ]; then
+            break
+        fi
+        echo -e "${RED}Error: Real-Debrid API Key cannot be empty. Please try again.${NC}"
+    done
 
     # Clone zurg-testing repository if 'zurg' directory doesn't exist
     if [ ! -d "zurg" ]; then
@@ -151,7 +153,8 @@ if ! command -v rclone &> /dev/null; then
             retries=5
             delay=10
             for ((i=1; i<=retries; i++)); do
-                apt-get update && apt-get install -y rclone fuse
+                echo "N" | DEBIAN_FRONTEND=noninteractive apt-get update && \
+                echo "N" | DEBIAN_FRONTEND=noninteractive apt-get install -y --force-confold rclone fuse
                 if command -v rclone &> /dev/null; then
                     break
                 fi
