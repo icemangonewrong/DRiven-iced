@@ -86,50 +86,47 @@ else
         rm docker-compose.yml
     fi
 
-    # Create the docker-compose.yml file (only Zurg)
-    cat > docker-compose.yml << EOF
-services:
-  zurg:
-    image: ${ZURG_IMAGE}
-    container_name: zurg
-    restart: unless-stopped
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - RD_API_KEY=${REAL_DEBRID_API_KEY}
-    volumes:
-      - ./plex_update.sh:/app/plex_update.sh
-      - ./config.yml:/app/config.yml
-      - ./data:/app/data
-    networks:
-      - zurg_network
+    # Create the docker-compose.yml file (only Zurg) with direct API key substitution
+    echo "services:" > docker-compose.yml
+    echo "  zurg:" >> docker-compose.yml
+    echo "    image: ${ZURG_IMAGE}" >> docker-compose.yml
+    echo "    container_name: zurg" >> docker-compose.yml
+    echo "    restart: unless-stopped" >> docker-compose.yml
+    echo "    environment:" >> docker-compose.yml
+    echo "      - PUID=${PUID}" >> docker-compose.yml
+    echo "      - PGID=${PGID}" >> docker-compose.yml
+    echo "      - TZ=${TZ}" >> docker-compose.yml
+    echo "      - RD_API_KEY=${REAL_DEBRID_API_KEY}" >> docker-compose.yml
+    echo "    volumes:" >> docker-compose.yml
+    echo "      - ./plex_update.sh:/app/plex_update.sh" >> docker-compose.yml
+    echo "      - ./config.yml:/app/config.yml" >> docker-compose.yml
+    echo "      - ./data:/app/data" >> docker-compose.yml
+    echo "    networks:" >> docker-compose.yml
+    echo "      - zurg_network" >> docker-compose.yml
+    echo "" >> docker-compose.yml
+    echo "networks:" >> docker-compose.yml
+    echo "  zurg_network:" >> docker-compose.yml
+    echo "    driver: bridge" >> docker-compose.yml
 
-networks:
-  zurg_network:
-    driver: bridge
-EOF
-
-    # Substitute the Real-Debrid API key directly
-    sed -i "s|\${REAL_DEBRID_API_KEY}|${REAL_DEBRID_API_KEY}|g" docker-compose.yml
-
-    if [ $? -ne 0 ]; then
+    if [ ! -f "docker-compose.yml" ]; then
         echo -e "${RED}Error: Failed to create docker-compose.yml.${NC}"
         exit 1
     fi
-
     echo -e "${GREEN}docker-compose.yml created successfully for Zurg.${NC}"
 
     # Update config.yml with the Real-Debrid API key
     CONFIG_FILE="./config.yml"
     if [ -f "$CONFIG_FILE" ]; then
-        sed -i "s|token: yourtoken|token: ${REAL_DEBRID_API_KEY}|" "$CONFIG_FILE"
+        sed -i "s|token: yourtoken|token: ${REAL_DEBRID_API_KEY}|g" "$CONFIG_FILE"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to update $CONFIG_FILE with API key.${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}Updated $CONFIG_FILE with Real-Debrid API key.${NC}"
     else
         echo -e "${RED}Error: $CONFIG_FILE does not exist.${NC}"
         exit 1
     fi
-
-    echo -e "${GREEN}Updated $CONFIG_FILE with Real-Debrid API key.${NC}"
 
     # Bring up the Zurg container
     docker compose up -d
