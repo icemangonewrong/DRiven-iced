@@ -70,8 +70,8 @@ retrieve_saved_ip() {
 }
 
 # Function to get the local IP address (now prompts user for manual input)
-get_zurg_container_ip() {
-docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' zurg
+get_local_ip() {
+    manual_ip_prompt
 }
 
 # Function to prompt the user for manual IP input and retry until valid
