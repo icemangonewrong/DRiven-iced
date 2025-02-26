@@ -153,8 +153,8 @@ if ! command -v rclone &> /dev/null; then
             retries=5
             delay=10
             for ((i=1; i<=retries; i++)); do
-                echo "N" | DEBIAN_FRONTEND=noninteractive apt-get update && \
-                echo "N" | DEBIAN_FRONTEND=noninteractive apt-get install -y --force-confold rclone fuse
+                DEBIAN_FRONTEND=noninteractive apt-get update && \
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" rclone fuse
                 if command -v rclone &> /dev/null; then
                     break
                 fi
