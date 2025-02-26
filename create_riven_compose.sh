@@ -119,6 +119,8 @@ services:
     image: spoked/riven:latest
     container_name: riven
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     environment:
       - PUID=$PUID
       - PGID=$PGID
