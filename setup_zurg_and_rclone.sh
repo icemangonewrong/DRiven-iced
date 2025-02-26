@@ -213,18 +213,19 @@ EOF
 chown "$PUID:$PGID" "$RCLONE_CONF_DIR" -R
 chmod 600 "$RCLONE_CONF"
 
-# Create systemd service file
+# Create systemd service file with Restart=always
 cat > /etc/systemd/system/rclone-mount.service << EOF
 [Unit]
 Description=rclone mount for zurg remote
 After=network-online.target docker.service
 Wants=network-online.target docker.service
+ExecStartPre=/bin/sleep 10
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/rclone mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full
 ExecStop=/bin/fusermount -u /mnt/zurg
-Restart=on-failure
+Restart=always
 User=$SUDO_USER
 Group=$(id -gn "$SUDO_USER")
 
