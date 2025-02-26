@@ -1,4 +1,10 @@
 @echo off
+setlocal EnableDelayedExpansion
+
+:: Clean up any leftover bad proxy rules from previous runs
+netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=ADDITIONAL_PORTS_INPUT: >nul 2>&1
+netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=N >nul 2>&1
+
 :: Fetch the WSL IP dynamically using PowerShell and only pick the first IP
 for /f "tokens=1" %%i in ('powershell -command "wsl hostname -I"') do set WSL_IP=%%i
 
@@ -24,20 +30,26 @@ if /i "%PROXY_PLEX%"=="Y" (
     set ADDITIONAL_PORTS=%PLEX_PORT%
 )
 
-:: Step 3: Ask if user wants to proxy any other ports
-set /p ADD_PORTS="Do you want to make any other ports accessible via %USER_IP%:? (Y/N): "
-if /i "%ADD_PORTS%"=="Y" (
-    set /p ADDITIONAL_PORTS_INPUT="Enter the port(s) you want to proxy (comma-separated, e.g., 8080,9090): "
-    
-    :: Process the input by replacing commas with spaces and appending to ADDITIONAL_PORTS
-    set "TEMP_PORTS=%ADDITIONAL_PORTS_INPUT:,= %"
-    set ADDITIONAL_PORTS=%ADDITIONAL_PORTS% %TEMP_PORTS%
+:: Step 3: Ask if user wants to proxy any other ports, one at a time
+set /p ADD_PORTS="Do you want to add an additional port to proxy? (Y/N): "
+:port_loop
+if /i "!ADD_PORTS!"=="Y" (
+    set /p NEW_PORT="Enter a port to proxy (e.g., 8080): "
+    if not "!NEW_PORT!"=="" if /i not "!NEW_PORT!"=="N" if /i not "!NEW_PORT!"=="Y" (
+        if "!ADDITIONAL_PORTS!"=="" (
+            set ADDITIONAL_PORTS=!NEW_PORT!
+        ) else (
+            set ADDITIONAL_PORTS=!ADDITIONAL_PORTS! !NEW_PORT!
+        )
+    )
+    set /p ADD_PORTS="Do you want to add an additional port? (Y/N): "
+    goto :port_loop
 )
 
 :: Step 4: Process all additional ports collected
-if not "%ADDITIONAL_PORTS%"=="" (
-    echo Processing the following ports: %ADDITIONAL_PORTS%
-    for %%p in (%ADDITIONAL_PORTS%) do (
+if not "!ADDITIONAL_PORTS!"=="" (
+    echo Processing the following ports: !ADDITIONAL_PORTS!
+    for %%p in (!ADDITIONAL_PORTS!) do (
         call :proxy_port %%p
     )
 )
@@ -54,15 +66,13 @@ echo Checking if port %PORT% is already proxied...
 netsh interface portproxy show v4tov4 | findstr "%PORT%" >nul
 if %ERRORLEVEL% equ 0 (
     echo Port forwarding already exists for 0.0.0.0:%PORT%
-    goto :configure_firewall
+) else (
+    :: Add port forwarding rule to proxy the specified port for all interfaces
+    echo Adding port forwarding for 0.0.0.0:%PORT% to WSL2 IP %WSL_IP%:%PORT%
+    netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=%PORT% connectaddress=%WSL_IP% connectport=%PORT%
 )
 
-:: Add port forwarding rule to proxy the specified port for all interfaces
-echo Adding port forwarding for 0.0.0.0:%PORT% to WSL2 IP %WSL_IP%:%PORT%
-netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=%PORT% connectaddress=%WSL_IP% connectport=%PORT%
-
-:: Configure the firewall
-:configure_firewall
+:: Always configure the firewall, even if port is already proxied
 echo Configuring firewall to allow access to port %PORT%...
 netsh advfirewall firewall add rule name="Allow Port %PORT%" dir=in action=allow protocol=TCP localport=%PORT%
 
