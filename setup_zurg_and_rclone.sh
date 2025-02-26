@@ -162,6 +162,29 @@ if ! command -v rclone &> /dev/null; then
     esac
 fi
 
+# Ensure /etc/fuse.conf allows user_allow_other
+if [ -f "/etc/fuse.conf" ]; then
+    if grep -q "^#user_allow_other" /etc/fuse.conf; then
+        echo -e "${YELLOW}Uncommenting user_allow_other in /etc/fuse.conf...${NC}"
+        sed -i 's|^#user_allow_other|user_allow_other|' /etc/fuse.conf
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to update /etc/fuse.conf.${NC}"
+            exit 1
+        fi
+    elif ! grep -q "^user_allow_other" /etc/fuse.conf; then
+        echo -e "${YELLOW}Adding user_allow_other to /etc/fuse.conf...${NC}"
+        echo "user_allow_other" >> /etc/fuse.conf
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to update /etc/fuse.conf.${NC}"
+            exit 1
+        fi
+    fi
+    echo -e "${GREEN}/etc/fuse.conf updated to allow user_allow_other.${NC}"
+else
+    echo -e "${RED}Error: /etc/fuse.conf does not exist. Please ensure FUSE is installed.${NC}"
+    exit 1
+fi
+
 # Ensure /mnt/zurg exists and has correct permissions
 mkdir -p /mnt/zurg
 chown -R "$PUID:$PGID" /mnt/zurg
