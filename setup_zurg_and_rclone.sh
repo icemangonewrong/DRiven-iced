@@ -147,21 +147,23 @@ if ! command -v rclone &> /dev/null; then
     echo -e "${YELLOW}Installing rclone...${NC}"
     case "$OS_NAME" in
         ubuntu|debian)
-            # Wait for APT lock to free up
+            # Wait for APT lock to free up and ensure rclone installs
             retries=5
             delay=10
             for ((i=1; i<=retries; i++)); do
                 apt-get update && apt-get install -y rclone fuse
-                if [ $? -eq 0 ]; then
+                if command -v rclone &> /dev/null; then
                     break
                 fi
                 if [ $i -eq $retries ]; then
-                    echo -e "${RED}Error: Failed to install rclone after $retries attempts. APT lock persists.${NC}"
+                    echo -e "${RED}Error: Failed to install rclone after $retries attempts. Please install manually with 'sudo apt install rclone fuse'.${NC}"
                     exit 1
                 fi
-                echo -e "${YELLOW}APT lock detected. Retrying in $delay seconds (attempt $i/$retries)...${NC}"
+                echo -e "${YELLOW}Failed to install rclone (APT lock or install issue). Retrying in $delay seconds (attempt $i/$retries)...${NC}"
                 sleep $delay
             done
+            # Ensure rclone is executable
+            chmod +x /usr/bin/rclone 2>/dev/null || echo -e "${YELLOW}rclone not at /usr/bin/rclone, checking elsewhere...${NC}"
             ;;
         arch|manjaro)
             pacman -Sy --noconfirm rclone fuse
@@ -176,11 +178,16 @@ if ! command -v rclone &> /dev/null; then
     esac
 fi
 
-# Verify rclone is installed
-if ! command -v rclone &> /dev/null; then
-    echo -e "${RED}Error: rclone installation failed or rclone not found in PATH.${NC}"
+# Verify rclone is installed and get its path
+RCLONE_PATH=$(which rclone)
+if [ -z "$RCLONE_PATH" ]; then
+    echo -e "${RED}Error: rclone installation failed or rclone not found in PATH. Please install manually with 'sudo apt install rclone fuse'.${NC}"
     exit 1
 fi
+echo -e "${GREEN}rclone found at: $RCLONE_PATH${NC}"
+
+# Ensure rclone is executable
+chmod +x "$RCLONE_PATH" 2>/dev/null
 
 # Ensure /etc/fuse.conf allows user_allow_other
 if [ -f "/etc/fuse.conf" ]; then
@@ -233,7 +240,7 @@ EOF
 chown "$PUID:$PGID" "$RCLONE_CONF_DIR" -R
 chmod 600 "$RCLONE_CONF"
 
-# Create systemd service file with Restart=always
+# Create systemd service file with dynamic rclone path and Restart=always
 cat > /etc/systemd/system/rclone-mount.service << EOF
 [Unit]
 Description=rclone mount for zurg remote
@@ -243,7 +250,7 @@ ExecStartPre=/bin/sleep 10
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/rclone mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full
+ExecStart=$RCLONE_PATH mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full
 ExecStop=/bin/fusermount -u /mnt/zurg
 Restart=always
 User=$SUDO_USER
