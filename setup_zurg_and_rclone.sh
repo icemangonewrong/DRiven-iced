@@ -57,10 +57,10 @@ zurg_running=$(docker ps --filter "name=zurg" --filter "status=running" -q)
 if [[ -n "$zurg_running" ]]; then
     echo -e "${YELLOW}Zurg is already running. Skipping container setup.${NC}"
 else
-    # Get Real-Debrid API Key using the common function
-    REAL_DEBRID_API_KEY=$(get_real_debrid_api_key)
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to get Real-Debrid API Key.${NC}"
+    # Prompt for Real-Debrid API Key directly
+    read -p "Enter your Real-Debrid API Key: " REAL_DEBRID_API_KEY
+    if [ -z "$REAL_DEBRID_API_KEY" ]; then
+        echo -e "${RED}Error: Real-Debrid API Key cannot be empty.${NC}"
         exit 1
     fi
 
