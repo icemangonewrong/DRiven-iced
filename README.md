@@ -101,7 +101,7 @@ After installation, the following default configurations will be set up:
 
 - **Riven Database**: The Riven database is stored in `/home/docker/riven-db`.
 
-- **Zurg/Rclone Information**: Zurg/rclone Information: Zurg files are in the zurg folder with the installation scripts and run in a Docker container. Rclone is installed separately as a standalone binary and managed as a systemd service (rclone-mount.service) to mount Zurg’s WebDAV endpoint at /mnt/zurg. The script skips Zurg setup if its container is running and skips rclone installation if it’s already present. 
+- **Zurg/Rclone Information**:  Zurg files are in the zurg folder with the installation scripts and run in a Docker container. Rclone is installed separately as a standalone binary and managed as a systemd service (rclone-mount.service) to mount Zurg’s WebDAV endpoint at /mnt/zurg. The script skips Zurg setup if its container is running and skips rclone installation if it’s already present. 
 
 - **Troubleshooting Logs**: A troubleshooting logs will be generated after running the script will be saved as `troubleshoot-<timestamp>.txt` in the same directory as the script. These logs are provided to help identify potential issues during onboarding or further setup, even if no errors occur.
 
