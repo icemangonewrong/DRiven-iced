@@ -38,7 +38,7 @@ Once Zurg and rclone have been initiated and the necessary mounts have been set 
 #### Windows Systems:
 1. The script will automatically install WSL if it’s not already on your system.
 2. **Important**: Open **Terminal** as an **Administrator**.
-3. In WSL, start the installation by running:
+3. In Windows Powershell, start the installation by running:
 
     ```bash
     ./windows_install.bat
