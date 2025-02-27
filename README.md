@@ -62,6 +62,7 @@ Running `windows_proxy.bat` will ensure that any ports exposed by Docker contain
 #### NOTE
 - During installation, you’ll have the option to install Plex Media Server.
 - Zurg and rclone will be automatically installed **only if they are not present** in the directory. If they are already installed, the script will skip their installation.
+-   In some cases, the script may not open a window as expected. If this happens, close the window, reopen PowerShell, type `wsl`, and then use the Linux bash command for the main setup.
 
 ## Bypass Riven Onboarding with Pre-Configured Settings
 
