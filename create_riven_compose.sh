@@ -135,7 +135,7 @@ services:
       - RIVEN_DATABASE_HOST=postgresql+psycopg2://postgres:postgres@riven-db/riven
       - RIVEN_PLEX_URL=
       - RIVEN_PLEX_TOKEN=
-      - RIVEN_PLEX_RCLONE_PATH=/mnt/zurg/__all__
+      - RIVEN_PLEX_RCLONE_PATH=$ZURG_ALL_PATH
       - RIVEN_PLEX_LIBRARY_PATH=/mnt/library
       - RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY=$RIVEN_DOWNLOADERS_REAL_DEBRID_API_KEY
       - RIVEN_ORIGIN=$ORIGIN
@@ -143,17 +143,18 @@ services:
       - HARD_RESET=false
     volumes:
       - ./riven/riven:/riven/data
-      - /mnt:/mnt/
-      - $ZURG_ALL_PATH:/mnt/zurg/__all__
+      - /mnt:/mnt
     depends_on:
       riven_postgres:
         condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "until nc -z riven-db 5432; do echo 'Waiting for riven-db...'; sleep 2; done && /riven/entrypoint.sh"]
     networks:
       - riven_network
 
   riven_postgres:
     image: postgres:17.0-alpine3.20
     container_name: riven-db
+    restart: unless-stopped
     environment:
       - PUID=$PUID
       - PGID=$PGID
@@ -168,7 +169,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     networks:
       - riven_network
 
