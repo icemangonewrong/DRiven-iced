@@ -243,17 +243,18 @@ EOF
 chown "$PUID:$PGID" "$RCLONE_CONF_DIR" -R
 chmod 600 "$RCLONE_CONF"
 
-# Create systemd service file with dynamic rclone path and Restart=always
+# Create systemd service file with dynamic rclone path and updated options
 cat > /etc/systemd/system/rclone-mount.service << EOF
 [Unit]
 Description=rclone mount for zurg remote
-After=network-online.target docker.service
-Wants=network-online.target docker.service
-ExecStartPre=/bin/sleep 10
+After=network-online.target
+Before=docker.service
+Wants=network-online.target
+ExecStartPre=/bin/sleep 5
 
 [Service]
 Type=simple
-ExecStart=$RCLONE_PATH mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode full
+ExecStart=$RCLONE_PATH mount zurg: /mnt/zurg --allow-other --allow-non-empty --dir-cache-time 10s --vfs-cache-mode writes
 ExecStop=/bin/fusermount -u /mnt/zurg
 Restart=always
 User=$SUDO_USER
